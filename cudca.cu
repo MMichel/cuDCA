@@ -4,6 +4,14 @@
 #include <map>
 #include <cstdlib>
 
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <stdarg.h> 
+#include <string.h> 
+#include <ctype.h> 
+#include <math.h> 
+#include <unistd.h> 
+ 
 #include <time.h>
 #include <assert.h>
 
@@ -61,9 +69,8 @@ static void testDevice(int devID)
 }
 
 
-
-
 void getAlignmentDim(char* file_name, size_t &B, size_t &N){
+
     std::string line;
     std::ifstream infile(file_name);
 
@@ -85,7 +92,7 @@ void getAlignmentDim(char* file_name, size_t &B, size_t &N){
 }
 
 
-void readAlignment(char* file_name, int* alignment, size_t B, size_t N){
+void readAlignment(char* file_name, int* aln, size_t B, size_t N){
 
     // amino acid to number dictionary
     std::map<char,int> aa_dict;
@@ -113,14 +120,14 @@ void readAlignment(char* file_name, int* alignment, size_t B, size_t N){
     aa_dict['-'] = 21;
 
 
-    // fill alignment matrix: BxN    
+    // fill aln matrix: BxN    
     std::string line;
     std::ifstream infile(file_name);
     if (infile){
         int b = 0;
         while (getline(infile, line)){
             for (int i = 0; i < line.length(); i++){
-                alignment[b*N + i] = aa_dict[line[i]];
+                aln[b*N + i] = aa_dict[line[i]];
             }
             b++;
         }
@@ -133,71 +140,141 @@ int delta(int a, int b){
 }
 
 
-void getFreqSingle(int* alignment, float* f_single, size_t B, size_t N){
+void getFreqSingle(int* aln, float* f_single, size_t B, size_t N){
 
     for (int i = 0; i < N; i++){
+        /*
         for (int k = 0; k < Q; k++){
             float f_ki = 0.0;
             for (int b = 0; b < B; b++){
-                f_ki += 1/(float)B * delta(alignment[b*N + i], k+1);
+                f_ki += 1/(float)B * delta(aln[b*N + i], k+1);
             }
             f_single[k*N + i] = f_ki;
+        }*/
+        for (int k = 0; k < Q; k++)
+            f_single[k*N + i] = 0.0;
+        
+        for (int b = 0; b < B; b++){
+            int k = aln[b*N + i] - 1;
+            f_single[k*N + i] += 1.0; 
         }
+
+        for (int k = 0; k < Q; k++)
+            f_single[k*N + i] /= (float)B;
     }
 }
 
-__global__ void getFreqSingleOnDevice(int* alignment, float* f_single, size_t B, size_t N){
+__global__ void getFreqSingleOnDevice(int* aln, float* f_single, size_t B, size_t N, int Q){
 
     // Grid dimensions: N x Q
     int i = threadIdx.x;
-    int k = threadIdx.y;
+    //int k = threadIdx.y;
 
+    /*
     float f_ki = 0.0;
     for (int b = 0; b < B; b++){
-        if (alignment[b*N + i] == k+1){
+        if (aln[b*N + i] == k+1){
             f_ki += 1/(float)B;
         }
     }
     f_single[k*N + i] = f_ki;
+    */
+    if(i < N){
+    for (int k = 0; k < Q; k++)
+        f_single[k*N + i] = 0.0;
+    
+    for (int b = 0; b < B; b++){
+        int k = aln[b*N + i] - 1;
+        f_single[k*N + i] += 1.0; 
+    }
+
+    for (int k = 0; k < Q; k++)
+        f_single[k*N + i] /= (float)B;
+
+    }
 }
 
 
-void getFreqPair(int* alignment, float* f_pair, size_t B, size_t N){
+void getFreqPair(int* aln, float* f_pair, size_t B, size_t N){
 
+    /*
     for (int i = 0; i < N; i++){
     for (int j = 0; j < N; j++){
         for (int k = 0; k < Q; k++){
         for (int l = 0; l < Q; l++){
             float f_klij = 0.0;
             for (int b = 0; b < B; b++){
-                f_klij += 1/(float)B * delta(alignment[b*N + i], k+1) * delta(alignment[b*N + j], l+1);
+                f_klij += 1/(float)B * delta(aln[b*N + i], k+1) * delta(aln[b*N + j], l+1);
             }
             f_pair[(Q*i + k) * Q*N + (Q*j + l)] = f_klij;
         }
         }
     }
     }
+    */
+
+    for (int i = 0; i < N; i++){
+    for (int j = 0; j < N; j++){
+        for (int k = 0; k < Q; k++)
+        for (int l = 0; l < Q; l++)
+            f_pair[(Q*i + k) * Q*N + (Q*j + l)] = 0.0;
+
+        for (int b = 0; b < B; b++){
+            int k = aln[b*N + i] - 1;
+            int l = aln[b*N + j] - 1;
+            f_pair[(Q*i + k) * Q*N + (Q*j + l)] += 1.0;
+        }
+
+        for (int k = 0; k < Q; k++){
+        for (int l = 0; l < Q; l++){
+            f_pair[(Q*i + k) * Q*N + (Q*j + l)] /= (float)B;
+            //f_pair[(Q*j + l) * Q*N + (Q*i + k)] = f_pair[(Q*i + k) * Q*N + (Q*j + l)];
+        }
+        }
+    }
+    }
+
 }
 
-__global__ void getFreqPairOnDevice(int* alignment, float* f_pair, size_t B, size_t N, int Q){
+__global__ void getFreqPairOnDevice(int* aln, float* f_pair, size_t B, size_t N, int Q){
 
     // Grid dimensions: N x N
     int i = threadIdx.x;
     int j = threadIdx.y;
 
+    /*
     for (int k = 0; k < Q; k++){
     for (int l = 0; l < Q; l++){
         float f_klij = 0.0;
         for (int b = 0; b < B; b++){
-            if ((alignment[b*N + i] == k+1) && (alignment[b*N + j] == l+1)){
+            if ((aln[b*N + i] == k+1) && (aln[b*N + j] == l+1)){
                 f_klij += 1/(float)B;
             }
         }
         f_pair[(Q*i + k) * Q*N + (Q*j + l)] = f_klij;
     }
     }
-}
+    */
+    if(i<N && j<N){
+    for (int k = 0; k < Q; k++)
+    for (int l = 0; l < Q; l++)
+        f_pair[(Q*i + k) * Q*N + (Q*j + l)] = 0.0;
 
+    for (int b = 0; b < B; b++){
+        int k = aln[b*N + i] - 1;
+        int l = aln[b*N + j] - 1;
+        f_pair[(Q*i + k) * Q*N + (Q*j + l)] += 1.0;
+    }
+
+    for (int k = 0; k < Q; k++){
+    for (int l = 0; l < Q; l++){
+        f_pair[(Q*i + k) * Q*N + (Q*j + l)] /= (float)B;
+        //f_pair[(Q*j + l) * Q*N + (Q*i + k)] = f_pair[(Q*i + k) * Q*N + (Q*j + l)];
+    }
+    }
+    }
+}
+    
 
 void getCovMat(float* f_single, float* f_pair, float* cov_mat, size_t B, size_t N){
 
@@ -234,19 +311,21 @@ int main(int argc, char** argv){
     selectGpu(&devID, &num_devs);
     testDevice(devID);    
    
-    // number of sequences in alignment
-    size_t B = 0;
+    // number of sequences in aln
+    size_t B;
     // length of each sequence
-    size_t N = 0;
+    size_t N;
 
     // Observe B and N from input file
     getAlignmentDim(argv[1], B, N);
 
-    // Read alignment from input file
+    // Read aln from input file
     // each amino acid/gap is represented by an integer
-    int* alignment = (int*) std::malloc(B*N * sizeof(int));
-    readAlignment(argv[1], alignment, B, N);
-
+    
+    std::cout << "Read alignment.." << std::endl;
+    
+    int* aln = (int*) std::malloc(B*N * sizeof(int));
+    readAlignment(argv[1], aln, B, N);
 
     // Host calculations:
    
@@ -254,12 +333,12 @@ int main(int argc, char** argv){
 
     // calculate column-wise amino acid frequencies
     float* f_single = (float*) std::malloc(Q*N * sizeof(float));
-    getFreqSingle(alignment, f_single, B, N);
+    getFreqSingle(aln, f_single, B, N);
 
     // calculate column-wise amino acid frequencies
     // for each possible pair of amino acids and columns
     float* f_pair = (float*) std::malloc(Q*N * Q*N * sizeof(float));
-    getFreqPair(alignment, f_pair, B, N);
+    getFreqPair(aln, f_pair, B, N);
 
     // calculate covariance matrix from frequencies
     float* cov_mat = (float*) std::malloc(Q*N * Q*N * sizeof(float));
@@ -271,15 +350,16 @@ int main(int argc, char** argv){
     // Device calculations:
     
     time_t start_d = clock();
-
+    
     // calculate column-wise amino acid frequencies
-    int* alignment_d;
+    int* aln_d;
     float* f_single_d;
-    assert(cudaSuccess == cudaMalloc((void**) &alignment_d, B*N * sizeof(int)));
+    assert(cudaSuccess == cudaMalloc((void**) &aln_d, B*N * sizeof(int)));
     assert(cudaSuccess == cudaMalloc((void**) &f_single_d, Q*N * sizeof(float)));
-    cudaMemcpy(alignment_d, alignment, B*N * sizeof(int), cudaMemcpyHostToDevice);
+    cudaMemcpy(aln_d, aln, B*N * sizeof(int), cudaMemcpyHostToDevice);
     cudaMemcpy(f_single_d, f_single, Q*N * sizeof(float), cudaMemcpyHostToDevice);
-    getFreqSingleOnDevice <<< N, Q >>> (alignment_d, f_single_d, B, N);
+    std::cout << "Calculate single frequencies.." << std::endl;
+    getFreqSingleOnDevice <<< N, 1 >>> (aln_d, f_single_d, B, N, Q);
 
     // calculate column-wise amino acid frequencies
     // for each possible pair of amino acids and columns
@@ -287,13 +367,15 @@ int main(int argc, char** argv){
     assert(cudaSuccess == cudaMalloc((void**) &f_pair_d,
                 Q*N * Q*N * sizeof(float)));
     cudaMemcpy(f_pair_d, f_pair, Q*N * Q*N * sizeof(float), cudaMemcpyHostToDevice);
-    getFreqPairOnDevice <<< N, N >>> (alignment_d, f_pair_d, B, N, Q);
+    std::cout << "Calculate pair frequencies.." << std::endl;
+    getFreqPairOnDevice <<< N, N >>> (aln_d, f_pair_d, B, N, Q);
 
     // calculate covariance matrix from frequencies
     float* cov_mat_d;
     assert(cudaSuccess == cudaMalloc((void**) &cov_mat_d,
                 Q*N * Q*N * sizeof(float)));
     cudaMemcpy(cov_mat_d, cov_mat, Q*N * Q*N * sizeof(float), cudaMemcpyHostToDevice);
+    std::cout << "Calculate covariance matrix.." << std::endl;
     getCovMatOnDevice <<< N, N >>> (f_single_d, f_pair_d, cov_mat_d, B, N, Q);
 
     // copy covariance matrix back from device
@@ -309,10 +391,10 @@ int main(int argc, char** argv){
     printf("\nTiming:\nFull: %f\nHost: %f\nDevice: %f\n\n", t_full, t_host, t_dev);
 
 
-    std::cout << B << ' ' << N << std::endl;
+    std::cout << B << ' ' << N << ' ' << Q << std::endl;
     //for (int i = 0; i < B; i++){
     //    for (int j = 0; j < N; j++){
-    //        std::cout << alignment[i*N +j] << ' ';
+    //        std::cout << aln[i*N +j] << ' ';
     //    }
     //    std::cout << std::endl;
     //}
@@ -324,11 +406,14 @@ int main(int argc, char** argv){
     //}
     float err = 0.0;
     for (int i = 0; i < N*Q; i++){
-        for (int j = 0; j < N*Q; j++){
+        int j;
+        //std::cout << std::endl << i << ' ';
+        for (j = 0; j < N*Q; j++){
             err += (cov_mat_from_d[i*N*Q + j] - cov_mat[i*N*Q + j]) / N*Q;
+            //std::cout << ' ' << j <<  '/' << cov_mat_from_d[i*N*Q + j] << '/' << cov_mat[i*N*Q + j];
         }
     }
-    std::cout << err << std::endl;
+    std::cout << std::endl << err << std::endl;
 
     return 0;
 }
