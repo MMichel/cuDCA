@@ -1,12 +1,10 @@
 test c++ 4.24 4.24 4.24
 test cuda 0.13 0.14 0.13
-test cuda_opt_1 0.1 0.11 0.1
-test cuda_opt_2 
+test cuda_opt 0.1 0.11 0.1
 test_small c++ 0.26 0.26 0.26
 test_small cuda 0.07 0.07 0.06
-test_small cuda_opt_1 0.06 0.05 0.05
-test_small cuda_opt_2 
+test_small cuda_opt 0.06 0.05 0.05
 test_real c++ 147.53 147.47 147.52 
 test_real psicov 1.93 1.93 1.93
 test_real cuda 2.21 2.2 2.21
-test_real cuda_opt_1 0.28 0.28 0.28
+test_real cuda_opt 0.28 0.28 0.28

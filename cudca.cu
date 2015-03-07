@@ -143,14 +143,6 @@ int delta(int a, int b){
 void getFreqSingle(int* aln, float* f_single, size_t B, size_t N){
 
     for (int i = 0; i < N; i++){
-        /*
-        for (int k = 0; k < Q; k++){
-            float f_ki = 0.0;
-            for (int b = 0; b < B; b++){
-                f_ki += 1/(float)B * delta(aln[b*N + i], k+1);
-            }
-            f_single[k*N + i] = f_ki;
-        }*/
         for (int k = 0; k < Q; k++)
             f_single[k*N + i] = 0.0;
         
@@ -168,17 +160,7 @@ __global__ void getFreqSingleOnDevice(int* aln, float* f_single, size_t B, size_
 
     // Grid dimensions: N x Q
     int i = threadIdx.x;
-    //int k = threadIdx.y;
 
-    /*
-    float f_ki = 0.0;
-    for (int b = 0; b < B; b++){
-        if (aln[b*N + i] == k+1){
-            f_ki += 1/(float)B;
-        }
-    }
-    f_single[k*N + i] = f_ki;
-    */
     if(i < N){
     for (int k = 0; k < Q; k++)
         f_single[k*N + i] = 0.0;
@@ -197,23 +179,8 @@ __global__ void getFreqSingleOnDevice(int* aln, float* f_single, size_t B, size_
 
 void getFreqPair(int* aln, float* f_pair, size_t B, size_t N){
 
-    /*
     for (int i = 0; i < N; i++){
-    for (int j = 0; j < N; j++){
-        for (int k = 0; k < Q; k++){
-        for (int l = 0; l < Q; l++){
-            float f_klij = 0.0;
-            for (int b = 0; b < B; b++){
-                f_klij += 1/(float)B * delta(aln[b*N + i], k+1) * delta(aln[b*N + j], l+1);
-            }
-            f_pair[(Q*i + k) * Q*N + (Q*j + l)] = f_klij;
-        }
-        }
-    }
-    }
-    */
 
-    for (int i = 0; i < N; i++){
     for (int j = 0; j < N; j++){
         for (int k = 0; k < Q; k++)
         for (int l = 0; l < Q; l++)
@@ -228,7 +195,6 @@ void getFreqPair(int* aln, float* f_pair, size_t B, size_t N){
         for (int k = 0; k < Q; k++){
         for (int l = 0; l < Q; l++){
             f_pair[(Q*i + k) * Q*N + (Q*j + l)] /= (float)B;
-            //f_pair[(Q*j + l) * Q*N + (Q*i + k)] = f_pair[(Q*i + k) * Q*N + (Q*j + l)];
         }
         }
     }
@@ -242,19 +208,6 @@ __global__ void getFreqPairOnDevice(int* aln, float* f_pair, size_t B, size_t N,
     int i = threadIdx.x;
     int j = threadIdx.y;
 
-    /*
-    for (int k = 0; k < Q; k++){
-    for (int l = 0; l < Q; l++){
-        float f_klij = 0.0;
-        for (int b = 0; b < B; b++){
-            if ((aln[b*N + i] == k+1) && (aln[b*N + j] == l+1)){
-                f_klij += 1/(float)B;
-            }
-        }
-        f_pair[(Q*i + k) * Q*N + (Q*j + l)] = f_klij;
-    }
-    }
-    */
     if(i<N && j<N){
     for (int k = 0; k < Q; k++)
     for (int l = 0; l < Q; l++)
@@ -263,6 +216,7 @@ __global__ void getFreqPairOnDevice(int* aln, float* f_pair, size_t B, size_t N,
     for (int b = 0; b < B; b++){
         int k = aln[b*N + i] - 1;
         int l = aln[b*N + j] - 1;
+
         f_pair[(Q*i + k) * Q*N + (Q*j + l)] += 1.0;
     }
 
