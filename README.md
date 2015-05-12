@@ -5,18 +5,13 @@ CUDA implementation of the initial steps of direct coupling analysis
 (DCA). Given a multiple sequence alignment, the tool calculates
 residue frequencies and the covariance matrix as described in
 "[Jones et al. 2012](http://www.ncbi.nlm.nih.gov/pubmed/22101153)" and "[Ekeberg et
-al. 2013](http://arxiv.org/pdf/1211.1281.pdf)". This project has been part
-of ["Introduction to GPU and accelerator programming for scientific
-computing"](http://sese.nu/introduction-to-gpu-and-accelerator-programming-for-scientific-computing-2014/),
-a course organized by [SeSE](http://sese.nu/) and [PDC at
-KTH](https://www.pdc.kth.se/).
+al. 2013](http://arxiv.org/pdf/1211.1281.pdf)".
 
 
 Problem
 -------
 
-Protein structure prediction is one of the longest standing problems
-in structural bioinformatics. One possibility to predict the structure
+One possibility to predict the structure
 of a protein is to first predict contacts between pairs of amino acids
 within the protein. These contacts are then be used to guide the
 structure prediction process. Amino acid contact prediction requires
