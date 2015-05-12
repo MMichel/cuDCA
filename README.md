@@ -29,3 +29,8 @@ Implementation
 --------------
 
 The calculations are implemented in three versions using C++ and CUDA: serially on the CPU, using un-optimized kernels in CUDA, and an optimized version. 
+
+TODO:
+-----
+The remaining steps...
+
